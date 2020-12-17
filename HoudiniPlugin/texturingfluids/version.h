@@ -1,0 +1,9 @@
+#ifndef SURFACETEXTURESYNTHESIS_VERSION_CONFIG_H
+#define SURFACETEXTURESYNTHESIS_VERSION_CONFIG_H
+
+// define your version_libinterface
+#define HOUDINI_VERSION 15
+
+
+
+#endif
