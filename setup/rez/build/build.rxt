@@ -1,0 +1,97 @@
+{
+    "default_patch_lock": "no_lock",
+    "rez_version": "2.60.1",
+    "num_loaded_packages": 26,
+    "package_requests": [
+        "cmake",
+        "opencv",
+        "houdini-18"
+    ],
+    "serialize_version": "4.4",
+    "resolved_packages": [
+        {
+            "variables": {
+                "index": null,
+                "version": "3.18.3",
+                "repository_type": "filesystem",
+                "location": "/Volumes/Infra/packages/tools",
+                "name": "cmake"
+            },
+            "key": "filesystem.variant"
+        },
+        {
+            "variables": {
+                "index": null,
+                "version": "4.1.2",
+                "repository_type": "filesystem",
+                "location": "/Volumes/Projects/Production/packages/tools",
+                "name": "opencv"
+            },
+            "key": "filesystem.variant"
+        },
+        {
+            "variables": {
+                "index": null,
+                "version": "18.5.408",
+                "repository_type": "filesystem",
+                "location": "/Volumes/Infra/packages/bin",
+                "name": "houdiniBin"
+            },
+            "key": "filesystem.variant"
+        },
+        {
+            "variables": {
+                "index": null,
+                "version": "18.5.408",
+                "repository_type": "filesystem",
+                "location": "/Volumes/Infra/packages/software",
+                "name": "houdini"
+            },
+            "key": "filesystem.variant"
+        }
+    ],
+    "append_sys_path": true,
+    "status": "solved",
+    "implicit_packages": [
+        "~platform==linux",
+        "~arch==x86_64",
+        "~os==CentOS-7.8.2003"
+    ],
+    "host": "wslin05.folksvfx.int",
+    "user": "jgagnon",
+    "package_filter": [],
+    "arch": "x86_64",
+    "solve_time": 0.016353130340576172,
+    "building": true,
+    "requested_timestamp": null,
+    "parent_suite_path": null,
+    "suite_context_name": null,
+    "package_orderers": null,
+    "graph": "{'nodes': [((('fillcolor', '#AAFFAA'), ('fontsize', 10), ('style', 'filled')), [('_9', 'houdiniBin-18.5.408[]'), ('_8', 'opencv-4.1.2[]'), ('_7', 'cmake-3.18.3[]'), ('_10', 'houdini-18.5.408[]')]), ((('fillcolor', '#F6F6F6'), ('fontsize', 10), ('style', 'filled,dashed')), [('_11', 'houdiniBin==18.5.408')]), ((('fillcolor', '#FFFFAA'), ('fontsize', 10), ('style', 'filled,dashed')), [('_6', '~os==CentOS-7.8.2003'), ('_5', '~arch==x86_64'), ('_4', '~platform==linux'), ('_3', 'houdini-18'), ('_2', 'opencv'), ('_1', 'cmake')])], 'edges': [((('arrowsize', '0.5'),), [('_3', '_10'), ('_2', '_8'), ('_1', '_7'), ('_11', '_9'), ('_10', '_11')])]}",
+    "failure_description": null,
+    "created": 1608309845,
+    "package_paths": [
+        "/home/jgagnon/packagesDev",
+        "/opt/localPackages",
+        "/Volumes/Projects/Production/packages/software",
+        "/Volumes/Projects/Production/packages/tools",
+        "/Volumes/Projects/Production/packages/beta",
+        "/Volumes/Projects/Production/packages/projects",
+        "/Volumes/Projects/Production/packages/2D",
+        "/Volumes/Projects/Production/packages/3D",
+        "/Volumes/Projects/Production/packages/plugins",
+        "/Volumes/Infra/packages/bin",
+        "/Volumes/Infra/packages/plugins",
+        "/Volumes/Infra/packages/software",
+        "/Volumes/Infra/packages/tools",
+        "/Volumes/Infra/packages/libs"
+    ],
+    "platform": "linux",
+    "rez_path": "/opt/rez/lib/python2.7/site-packages/rez",
+    "patch_locks": {},
+    "from_cache": false,
+    "timestamp": 1608309845,
+    "caching": true,
+    "load_time": 0.0,
+    "os": "CentOS-7.8.2003"
+}
