@@ -71,7 +71,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14")
 if( DEFINED ENV{HFS} )
     # Display the HFS environment variable
     message( STATUS "HFS directory: " $ENV{HFS} )
-
+    message( STATUS "APPEND CMAKE PREFIX PATH: " $ENV{HFS}/toolkit/cmake )
     # Locate Houdini's libraries and header files
     list( APPEND CMAKE_PREFIX_PATH "$ENV{HFS}/toolkit/cmake" )
 else()
