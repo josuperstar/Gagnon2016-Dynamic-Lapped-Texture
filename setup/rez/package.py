@@ -4,12 +4,12 @@ uuid = "ba65a0c2-b993-4212-a965-4a701d1be618"
 
 description = "Texturing Fluid with rigid patches"
 
-version = "1.1.1"
+version = "1.1.2"
 
 
 authors = [ "Jonathan Gagnon" ]
 
-requires = ['cmake', 'opencv', 'houdini-18']
+requires = ['cmake', 'opencv', 'houdini-17']
 
 # if the HFS is not set, we need to add it in the houdini pacakge as: env.HFS.append("{root}/bin/{system.platform}/toolkit")
 
