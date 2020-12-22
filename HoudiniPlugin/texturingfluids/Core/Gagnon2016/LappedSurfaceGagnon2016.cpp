@@ -346,20 +346,55 @@ void LappedSurfaceGagnon2016::OrthogonalUVProjection()
 
     GA_RWHandleV3 attUVTracker(trackersGdp->addFloatTuple(GA_ATTRIB_POINT,"uv", 3));
 
-    GA_FOR_ALL_PTOFF(trackersGdp, ppt)
+    // We need to sorted trackers according to their id
+    set<int> sortedTrackers;
+    set<int>::iterator sortedIt;
+    map<int, GA_Offset> trackersMap;
     {
-        patchNumber = attId.get(ppt);
-        if (params.testPatch == 1 && params.patchNumber != patchNumber)
-            continue;
+        GA_FOR_ALL_PTOFF(trackersGdp, ppt)
+        {
+            patchNumber = attId.get(ppt);
+            isTangeant = isTangeantTracker.get(ppt);
+            if (isTangeant == 1)
+            {
+                continue;
+            }
+            sortedTrackers.insert(patchNumber);
+            trackersMap[patchNumber] = ppt;
+        }
+    }
+//    cout << "Resulting map "<<endl;
+//    for (sortedIt = sortedTrackers.begin(); sortedIt != sortedTrackers.end(); sortedIt++)
+//    {
+//        patchNumber = *sortedIt;
+//        ppt = trackersMap[patchNumber];
+//        cout << patchNumber << " "<<ppt<<endl;
+//    }
+
+    for (sortedIt = sortedTrackers.begin(); sortedIt != sortedTrackers.end(); sortedIt++)
+    {
+
+        //patchNumber = attId.get(ppt);
+        patchNumber = *sortedIt;
+        GA_Offset trackerPpt = trackersMap[patchNumber];
+
+        cout << "Dealing with "<<patchNumber;
+
+//        if (params.testPatch == 1 && params.patchNumber != patchNumber)
+//            continue;
 
         //replace the tangeant tracker
-        isTangeant = isTangeantTracker.get(ppt);
+        isTangeant = isTangeantTracker.get(trackerPpt);
         if (isTangeant == 1)
+        {
+            cout << "Is a tangeant tracker"<<endl;
             continue;
+        }
+        cout << " working on it"<<endl;
         //cout << "Project UV for patch "<<patchNumber<<endl;
-        N = attN.get(ppt);
-        trackerPosition = trackersGdp->getPos3(ppt);
-        GA_Offset tracker_offset = ppt+1;
+        N = attN.get(trackerPpt);
+        trackerPosition = trackersGdp->getPos3(trackerPpt);
+        GA_Offset tracker_offset = trackerPpt+1;
         UT_Vector3 tangeantPosition = trackersGdp->getPos3(tracker_offset);
         UT_Vector3 currentDirection = tangeantPosition-trackerPosition;
         currentDirection.normalize();
@@ -387,7 +422,7 @@ void LappedSurfaceGagnon2016::OrthogonalUVProjection()
         centerUv /= params.UVScaling;
         centerUv += mid;
 
-        attUVTracker.set(ppt,centerUv);
+        attUVTracker.set(trackerPpt,centerUv);
 
         string patchGroupName= "patch"+std::to_string(patchNumber);
 
@@ -455,10 +490,10 @@ void LappedSurfaceGagnon2016::OrthogonalUVProjection()
             if (nbTreated > 0)
             {
                 centerUV /= nbTreated;
-                attCenterUV.set(ppt,centerUV);
+                attCenterUV.set(trackerPpt,centerUV);
             }
         }
-        attCenterUV.set(ppt,UT_Vector3(0.5,0.5,0.0));
+        attCenterUV.set(trackerPpt,UT_Vector3(0.5,0.5,0.0));
     }
     this->orthogonalUVProjectionTime += (std::clock() - projectionStart) / (double) CLOCKS_PER_SEC;
 }

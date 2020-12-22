@@ -68,7 +68,7 @@ void DynamicLappedTexture::Synthesis(GU_Detail *surfaceGdp, GU_Detail *trackersG
     GA_RWHandleI    attId(trackersGdp->findIntTuple(GA_ATTRIB_POINT,"id",1));
 
     //=========================== CORE ALGORITHM ============================
-    bool shufflePatchIds = false; //When this is true, we have a weird texture synthesis artifacté
+    bool shufflePatchIds = true; //When this is true, we have a weird texture synthesis artifacté
 
     if(params.startFrame == params.frame)
     {
