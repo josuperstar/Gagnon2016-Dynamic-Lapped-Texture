@@ -56,11 +56,15 @@ bool AtlasGagnon2016Synthesis::Synthesis(GU_Detail *surfaceGdp, GU_Detail *track
 //    atlas.SetNumberOfTextureSampleFrame(params.NumberOfTextureSampleFrame);
 
     GA_RWHandleI attId(trackersGdp->findIntTuple(GA_ATTRIB_POINT,"id",1));
+    GA_RWHandleI isTangeantTracker(trackersGdp->findIntTuple(GA_ATTRIB_POINT, "isTrangeantTracker",1));
     map<int,UT_Vector3> trackerPositions;
     {
         GA_Offset ppt;
         GA_FOR_ALL_PTOFF(trackersGdp,ppt)
         {
+            int isTangeant = isTangeantTracker.get(ppt);
+            if (isTangeant == 1)
+                continue;
             int id = attId.get(ppt);
             trackerPositions[id] = trackersGdp->getPos3(ppt);
         }

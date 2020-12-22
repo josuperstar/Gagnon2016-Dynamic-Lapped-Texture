@@ -25,7 +25,10 @@
 #include <GU/GU_RayIntersect.h>
 
 #include <Core/Gagnon2016/LappedSurfaceGagnon2016.h>
-#include <Core/Gagnon2016/Bridson2012PoissonDiskDistribution.h>
+
+
+// random generator function:
+int myrandom (GA_Offset i) { return std::rand()%i;}
 
 DynamicLappedTexture::DynamicLappedTexture()
 {
@@ -37,7 +40,16 @@ DynamicLappedTexture::~DynamicLappedTexture()
 
 void DynamicLappedTexture::Synthesis(GU_Detail *surfaceGdp, GU_Detail *trackersGdp, GU_Detail *levelSet, ParametersDeformablePatches params)
 {
-    LappedSurfaceGagnon2016 surface(surfaceGdp, trackersGdp);
+
+    const string surfaceGroupName = "surface";
+    GA_PointGroup *surfaceGroup = (GA_PointGroup *)surfaceGdp->pointGroups().find(surfaceGroupName.c_str());
+    if (surfaceGroup == 0x0)
+    {
+        cout << "There is no surface group to synthesis"<<endl;
+        return;
+    }
+
+    LappedSurfaceGagnon2016 surface(surfaceGdp, surfaceGroup, trackersGdp, params);
     cout << "[DynamicLappedTexture::Synthesis] "<<params.frame<<endl;
     //params.useDynamicTau = false;
 
@@ -47,37 +59,50 @@ void DynamicLappedTexture::Synthesis(GU_Detail *surfaceGdp, GU_Detail *trackersG
     const GA_SaveOptions *options;
     UT_StringArray *errors;
 
-    GA_PointGroup *surfaceGroup = (GA_PointGroup *)surfaceGdp->pointGroups().find(surface.surfaceGroupName.c_str());
-    if (surfaceGroup == 0x0)
-    {
-        cout << "There is no surface group to synthesis"<<endl;
-        return;
-    }
+
     //=======================================================
 
     GEO_PointTreeGAOffset surfaceTree;
     surfaceTree.build(surfaceGdp, NULL);
+    vector<GA_Offset> newPatchesPoints;
+    GA_RWHandleI    attId(trackersGdp->findIntTuple(GA_ATTRIB_POINT,"id",1));
 
     //=========================== CORE ALGORITHM ============================
+    bool shufflePatchIds = true; //When this is true, we have a weird texture synthesis artifacté
 
     if(params.startFrame == params.frame)
     {
-        surface.PoissonDiskSampling(levelSet,trackersGdp,params);
-        //surface.ShufflePoints(trackersGdp);
 
-
+        newPatchesPoints = surface.PoissonDiskSamplingDistribution(levelSet,params.poissondiskradius, params.poissonAngleNormalThreshold);
+        if (shufflePatchIds)
+        {
+            std::srand ( unsigned ( std::time(0) ) );
+            vector<GA_Offset>::iterator itPoint;
+            cout << "random shuffle offset values"<<endl;
+            std::random_shuffle ( newPatchesPoints.begin(), newPatchesPoints.end(), myrandom);
+            int index = 0;
+            for (itPoint = newPatchesPoints.begin(); itPoint != newPatchesPoints.end(); itPoint++)
+            {
+                index++;
+                GA_Offset newPoint = *itPoint;
+                attId.set(newPoint,index);
+                // taking the next point offset which is supposed to the tangeant tracker.
+                GA_Offset tangeantNewPoint = newPoint + 1;
+                attId.set(tangeantNewPoint, index);
+            }
+        }
     }
     else
     {
-        surface.AdvectTrackersAndTangeants(surfaceGdp, trackersGdp, params);
-        surface.UpdateTrackersAndTangeant(surfaceGdp,trackersGdp, surfaceGroup,params);
-        surface.PoissonDiskSampling(levelSet,trackersGdp,params);
+        surface.AdvectTrackersAndTangeants();
+        surface.UpdateTrackersAndTangeant();
+        surface.PoissonDiskSamplingDistribution(levelSet,params.poissondiskradius, params.poissonAngleNormalThreshold);
     }
-
-    surface.CreateAndUpdateTrackersBasedOnPoissonDisk(surfaceGdp,trackersGdp,surfaceGroup,params);
+    cout << "Using less arguments"<<endl;
+    surface.CreateAndUpdateTrackersBasedOnPoissonDisk();
     //For the blending computation, we create uv array per vertex that we called patch
-    surface.AddSolidPatchesUsingBarycentricCoordinates(surfaceGdp,trackersGdp, params,surfaceTree);
-    surface.OrthogonalUVProjection(surfaceGdp,trackersGdp,params);
+    surface.AddSolidPatchesUsingBarycentricCoordinates();
+    surface.OrthogonalUVProjection();
 
     //=======================================================================
 

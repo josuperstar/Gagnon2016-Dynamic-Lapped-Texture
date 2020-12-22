@@ -183,10 +183,10 @@ Pixel BlendingGagnon2016::Blend(GU_Detail* trackersGdp,GU_Detail* deformableGrid
         positionInPolygon.z() = 0;
         float d_P = distance3d(positionInPolygon,centerUV);
 
-        if (d_P > 0.25*params.PatchScaling)
+        if (d_P > 0.125*params.PatchScaling)
         {
             if (debug)
-                cout << "d_P "<<d_P << " > "<<0.25*params.PatchScaling<<endl;
+                cout << "d_P "<<d_P << " > "<<0.125*params.PatchScaling<<endl;
             alpha = 0;
         }
         color.A = alpha;

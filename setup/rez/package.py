@@ -4,7 +4,7 @@ uuid = "ba65a0c2-b993-4212-a965-4a701d1be618"
 
 description = "Texturing Fluid with rigid patches"
 
-version = "1.1.3"
+version = "1.1.4"
 
 
 authors = [ "Jonathan Gagnon" ]

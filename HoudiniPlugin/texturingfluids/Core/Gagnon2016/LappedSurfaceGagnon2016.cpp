@@ -27,12 +27,10 @@
 #include <GU/GU_RayIntersect.h>
 #include <GU/GU_Flatten.h>
 
-//#include <Strategies/StrategySurfaceTextureSynthesis.h>
-#include <Core/Gagnon2016/Bridson2012PoissonDiskDistribution.h>
 #include <Core/HoudiniUtils.h>
 
 
-LappedSurfaceGagnon2016::LappedSurfaceGagnon2016(GU_Detail *surface, GU_Detail *trackersGdp) : ParticleAndTrackerManagerGagnon2016(surface, trackersGdp)
+LappedSurfaceGagnon2016::LappedSurfaceGagnon2016(GU_Detail *surface, GA_PointGroup *surfaceGroup, GU_Detail *trackersGdp, ParametersDeformablePatches params) : ParticleAndTrackerManagerGagnon2016(surface, surfaceGroup, trackersGdp, params)
 {
     this->numberOfPatches = 0;
     this->maxId = 0;
@@ -140,6 +138,9 @@ LappedSurfaceGagnon2016::LappedSurfaceGagnon2016(GU_Detail *surface, GU_Detail *
     this->numberOfConcealedPatches = 0;
     this->numberOfNewPatches = 0;
     this->numberOfDetachedPatches = 0;
+
+    cout << "[LappedSurfaceGagnon2016] Building surface tree"<<endl;
+    surfaceTree.build(surfaceGdp, NULL);
 }
 
 LappedSurfaceGagnon2016::~LappedSurfaceGagnon2016()
@@ -149,102 +150,6 @@ LappedSurfaceGagnon2016::~LappedSurfaceGagnon2016()
 }
 
 
-void LappedSurfaceGagnon2016::ShufflePoints(GU_Detail *trackersGdp)
-{
-    //Create a list of trackers combined to shuffle
-    cout << "LappedSurfaceGagnon2016::ShufflePoints"<<endl;
-
-    struct tracker
-    {
-        GA_Offset p;
-        GA_Offset t;
-        int id;
-    };
-
-    vector<tracker> trackers;
-    GA_Offset ppt;
-    GA_FOR_ALL_PTOFF(trackersGdp, ppt)
-    {
-        int isTangeant = isTangeantTracker.get(ppt);
-        if (isTangeant == 1)
-            continue;
-
-        int patchNumber = attId.get(ppt);
-
-        tracker t;
-        t.id = patchNumber;
-        t.p = ppt;
-        t.t = ppt+1;
-        trackers.push_back(t);
-    }
-
-    // obtain a time-based seed:
-    unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
-
-    shuffle (trackers.begin(), trackers.end(), std::default_random_engine(seed));
-
-    vector<tracker>::iterator itTrack;
-    int trackerNumber = 1;
-    for (itTrack = trackers.begin(); itTrack != trackers.end(); itTrack++)
-    {
-        attId.set((*itTrack).p, trackerNumber);
-        attId.set((*itTrack).t, trackerNumber);
-        trackerNumber++;
-    }
-}
-
-
-//================================================================================================
-
-//                                     POISSON DISK SAMPLING
-
-//================================================================================================
-
-
-void LappedSurfaceGagnon2016::PoissonDiskSampling(GU_Detail *levelSet, GU_Detail *trackersGdp, ParametersDeformablePatches params)
-{
-
-    //This is a function that does a Poisson Disk Sampling using the approach of Bridson 2012 paper
-    //This function is a wrapper to the Bridson2012PoissonDiskDistribution class.
-    //It basically take the points from Houdini and fill it to the approach.
-
-    std::clock_t addPoissonDisk;
-    addPoissonDisk = std::clock();
-
-    cout << "[LappedSurfaceGagnon2016:PoissonDiskSampling]"<<endl;
-
-    GEO_PointTreeGAOffset trackerTree;
-    trackerTree.build(trackersGdp, NULL);
-
-    //cout << "[Yu2011] we have "<<numberOfPoints << " existing point(s) in trackersGdp"<<endl;
-    Bridson2012PoissonDiskDistribution poissonDiskDistribution;
-    poissonDiskDistribution.PoissonDiskSampling(trackersGdp, trackerTree, levelSet, params.poissonAngleNormalThreshold, params);
-
-    cout << "[LappedSurfaceGagnon2016] poisson disk sample "<<trackersGdp->getNumPoints()<< " point(s)"<<endl;
-    this->poissondisk += (std::clock() - addPoissonDisk) / (double) CLOCKS_PER_SEC;
-}
-
-void LappedSurfaceGagnon2016::CreateAPatch(GU_Detail *trackersGdp,  ParametersDeformablePatches params)
-{
-    //This is a function that does a Poisson Disk Sampling using the approach of Bridson 2012 paper
-    //This function is a wrapper to the Bridson2012PoissonDiskDistribution class.
-    //It basically take the points from Houdini and fill it to the approach.
-
-    std::clock_t addPoissonDisk;
-    addPoissonDisk = std::clock();
-
-    GEO_PointTreeGAOffset trackerTree;
-    trackerTree.build(trackersGdp, NULL);
-
-    //cout << "[Yu2011] we have "<<numberOfPoints << " existing point(s) in trackersGdp"<<endl;
-    Bridson2012PoissonDiskDistribution poissonDiskDistribution;
-    int numberOfClosePoint = 0;
-    poissonDiskDistribution.CreateAParticle(trackersGdp, trackerTree, UT_Vector3(0,0,0),UT_Vector3(0,1,0),1,numberOfClosePoint,params);
-
-    cout << "[Yu2011] poisson disk sample "<<trackersGdp->getNumPoints()<< " point(s)"<<endl;
-
-    this->poissondisk += (std::clock() - addPoissonDisk) / (double) CLOCKS_PER_SEC;
-}
 
 //================================================================================================
 
@@ -253,7 +158,7 @@ void LappedSurfaceGagnon2016::CreateAPatch(GU_Detail *trackersGdp,  ParametersDe
 //================================================================================================
 
 
-void LappedSurfaceGagnon2016::AddSolidPatchesUsingBarycentricCoordinates(GU_Detail *surfaceGdp, GU_Detail *trackersGdp, ParametersDeformablePatches params, GEO_PointTreeGAOffset &surfaceTree)
+void LappedSurfaceGagnon2016::AddSolidPatchesUsingBarycentricCoordinates()
 {
 
     //This function is used to transfer the uv list from the deformable patches to the surface where the texture will be synthesis.
@@ -278,7 +183,6 @@ void LappedSurfaceGagnon2016::AddSolidPatchesUsingBarycentricCoordinates(GU_Deta
     }
 
     set<int> patchTreated;
-    float r = params.poissondiskradius;
 
     UT_Vector3 N;
     UT_Vector3 NN;
@@ -425,14 +329,14 @@ void LappedSurfaceGagnon2016::AddSolidPatchesUsingBarycentricCoordinates(GU_Deta
     this->patchCreationTime += (std::clock() - addPatchesStart) / (double) CLOCKS_PER_SEC;
 }
 
-void LappedSurfaceGagnon2016::OrthogonalUVProjection(GU_Detail* surface, GU_Detail *trackersGdp, ParametersDeformablePatches params)
+void LappedSurfaceGagnon2016::OrthogonalUVProjection()
 {
     cout << "[LappedSurfaceGagnon2016] OrthogonalUVProjection" << endl;
     this->orthogonalUVProjectionTime = 0;
     std::clock_t projectionStart;
     projectionStart = std::clock();
     GA_GroupType groupType = GA_GROUP_POINT;
-    const GA_GroupTable *gtable = surface->getGroupTable(groupType);
+    const GA_GroupTable *gtable = surfaceGdp->getGroupTable(groupType);
     int patchNumber=0;
     GA_Offset ppt;
     UT_Vector3 N;
@@ -442,20 +346,55 @@ void LappedSurfaceGagnon2016::OrthogonalUVProjection(GU_Detail* surface, GU_Deta
 
     GA_RWHandleV3 attUVTracker(trackersGdp->addFloatTuple(GA_ATTRIB_POINT,"uv", 3));
 
-    GA_FOR_ALL_PTOFF(trackersGdp, ppt)
+    // We need to sorted trackers according to their id
+    set<int> sortedTrackers;
+    set<int>::iterator sortedIt;
+    map<int, GA_Offset> trackersMap;
     {
-        patchNumber = attId.get(ppt);
-        if (params.testPatch == 1 && params.patchNumber != patchNumber)
-            continue;
+        GA_FOR_ALL_PTOFF(trackersGdp, ppt)
+        {
+            patchNumber = attId.get(ppt);
+            isTangeant = isTangeantTracker.get(ppt);
+            if (isTangeant == 1)
+            {
+                continue;
+            }
+            sortedTrackers.insert(patchNumber);
+            trackersMap[patchNumber] = ppt;
+        }
+    }
+//    cout << "Resulting map "<<endl;
+//    for (sortedIt = sortedTrackers.begin(); sortedIt != sortedTrackers.end(); sortedIt++)
+//    {
+//        patchNumber = *sortedIt;
+//        ppt = trackersMap[patchNumber];
+//        cout << patchNumber << " "<<ppt<<endl;
+//    }
+
+    for (sortedIt = sortedTrackers.begin(); sortedIt != sortedTrackers.end(); sortedIt++)
+    {
+
+        //patchNumber = attId.get(ppt);
+        patchNumber = *sortedIt;
+        GA_Offset trackerPpt = trackersMap[patchNumber];
+
+        cout << "Dealing with "<<patchNumber;
+
+//        if (params.testPatch == 1 && params.patchNumber != patchNumber)
+//            continue;
 
         //replace the tangeant tracker
-        isTangeant = isTangeantTracker.get(ppt);
+        isTangeant = isTangeantTracker.get(trackerPpt);
         if (isTangeant == 1)
+        {
+            cout << "Is a tangeant tracker"<<endl;
             continue;
+        }
+        cout << " working on it"<<endl;
         //cout << "Project UV for patch "<<patchNumber<<endl;
-        N = attN.get(ppt);
-        trackerPosition = trackersGdp->getPos3(ppt);
-        GA_Offset tracker_offset = ppt+1;
+        N = attN.get(trackerPpt);
+        trackerPosition = trackersGdp->getPos3(trackerPpt);
+        GA_Offset tracker_offset = trackerPpt+1;
         UT_Vector3 tangeantPosition = trackersGdp->getPos3(tracker_offset);
         UT_Vector3 currentDirection = tangeantPosition-trackerPosition;
         currentDirection.normalize();
@@ -465,7 +404,7 @@ void LappedSurfaceGagnon2016::OrthogonalUVProjection(GU_Detail* surface, GU_Deta
         T = cross(S,N);
         T.normalize();
 
-        GA_RWHandleV3 surfaceAttUV(surface->addFloatTuple(GA_ATTRIB_POINT,"uv"+std::to_string(patchNumber), 3));
+        GA_RWHandleV3 surfaceAttUV(surfaceGdp->addFloatTuple(GA_ATTRIB_POINT,"uv"+std::to_string(patchNumber), 3));
 
         // Transform into local patch space (where STN is aligned with XYZ at the origin)
         UT_Vector3 trackerTrianglePos;
@@ -483,7 +422,7 @@ void LappedSurfaceGagnon2016::OrthogonalUVProjection(GU_Detail* surface, GU_Deta
         centerUv /= params.UVScaling;
         centerUv += mid;
 
-        attUVTracker.set(ppt,centerUv);
+        attUVTracker.set(trackerPpt,centerUv);
 
         string patchGroupName= "patch"+std::to_string(patchNumber);
 
@@ -494,11 +433,11 @@ void LappedSurfaceGagnon2016::OrthogonalUVProjection(GU_Detail* surface, GU_Deta
             GA_Offset pointOffset;
             int nbTreated = 0;
             UT_Vector3 centerUV = UT_Vector3(0,0,0);
-            GA_FOR_ALL_GROUP_PTOFF(surface, pointGrp, pointOffset)
+            GA_FOR_ALL_GROUP_PTOFF(surfaceGdp, pointGrp, pointOffset)
             {
                 //cout << "Projection for patch "<<pointGrp->getName()<<endl;
                 //----------------------- UV PROJECTION --------------
-                UT_Vector3 currentPosition = surface->getPos3(pointOffset);
+                UT_Vector3 currentPosition = surfaceGdp->getPos3(pointOffset);
 
                 // Transform into local patch space (where STN is aligned with XYZ at the origin)
                 const UT_Vector3 relativePosistion = currentPosition-trackerPosition;
@@ -551,10 +490,10 @@ void LappedSurfaceGagnon2016::OrthogonalUVProjection(GU_Detail* surface, GU_Deta
             if (nbTreated > 0)
             {
                 centerUV /= nbTreated;
-                attCenterUV.set(ppt,centerUV);
+                attCenterUV.set(trackerPpt,centerUV);
             }
         }
-        attCenterUV.set(ppt,UT_Vector3(0.5,0.5,0.0));
+        attCenterUV.set(trackerPpt,UT_Vector3(0.5,0.5,0.0));
     }
     this->orthogonalUVProjectionTime += (std::clock() - projectionStart) / (double) CLOCKS_PER_SEC;
 }
@@ -563,7 +502,7 @@ void LappedSurfaceGagnon2016::OrthogonalUVProjection(GU_Detail* surface, GU_Deta
 //                                                  UpdateUsingBridson2012PoissonDisk
 //======================================================================================================================================
 
-void LappedSurfaceGagnon2016::DeleteUnusedPatches(GU_Detail *gdp, GU_Detail *trackersGdp, ParametersDeformablePatches params)
+void LappedSurfaceGagnon2016::DeleteUnusedPatches()
 {
     cout << this->approachName<<" Update Using Bridson 2012 Poisson Disk with "<<numberOfPatches<<" existing trackers"<<endl;
     std::clock_t startUpdatePatches;
@@ -586,9 +525,9 @@ void LappedSurfaceGagnon2016::DeleteUnusedPatches(GU_Detail *gdp, GU_Detail *tra
 
     GA_PointGroup *grpToDestroy = (GA_PointGroup *)trackersGdp->newPointGroup("ToDelete");
     GA_GroupType groupType = GA_GROUP_POINT;
-    const GA_GroupTable *gtable = gdp->getGroupTable(groupType);
+    const GA_GroupTable *gtable = surfaceGdp->getGroupTable(groupType);
     GA_GroupType primGroupType = GA_GROUP_PRIMITIVE;
-    const GA_GroupTable *gPrimTable = gdp->getGroupTable(primGroupType);
+    const GA_GroupTable *gPrimTable = surfaceGdp->getGroupTable(primGroupType);
     set<int> toDelete;
     //--------------------------- DELETE DEAD PATCH --------------------------------------------
     {
@@ -612,14 +551,14 @@ void LappedSurfaceGagnon2016::DeleteUnusedPatches(GU_Detail *gdp, GU_Detail *tra
                 if (pointGrp != 0x0)
                 {
                     //cout << "delete points "<<endl;
-                    gdp->deletePoints(*pointGrp,mode);
+                    surfaceGdp->deletePoints(*pointGrp,mode);
                     //cout << "delete point group "<<groupName<<endl;
-                    gdp->destroyPointGroup(pointGrp);
+                    surfaceGdp->destroyPointGroup(pointGrp);
                 }
                 if (primGroup != 0x0)
                 {
                     //cout << "delete point group "<<groupName<<endl;
-                    gdp->destroyPrimitiveGroup(primGroup);
+                    surfaceGdp->destroyPrimitiveGroup(primGroup);
                 }
             }
         }
