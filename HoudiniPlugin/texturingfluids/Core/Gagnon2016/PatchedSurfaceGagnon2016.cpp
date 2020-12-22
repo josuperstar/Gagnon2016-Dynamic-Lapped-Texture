@@ -24,12 +24,10 @@
 #include <GU/GU_RayIntersect.h>
 #include <GU/GU_Flatten.h>
 
-//#include <Strategies/StrategySurfaceTextureSynthesis.h>
-#include <Core/Gagnon2016/Bridson2012PoissonDiskDistribution.h>
 #include <Core/HoudiniUtils.h>
 
 
-PatchedSurface::PatchedSurface(GU_Detail *surface, GU_Detail *trackersGdp) : ParticleAndTrackerManagerGagnon2016(surface, trackersGdp)
+PatchedSurface::PatchedSurface(GU_Detail *surface, GU_Detail *trackersGdp, ParametersDeformablePatches params) : ParticleAndTrackerManagerGagnon2016(surface, trackersGdp, params)
 {
     //this->numberOfPatches = 0;
 
@@ -136,70 +134,13 @@ PatchedSurface::PatchedSurface(GU_Detail *surface, GU_Detail *trackersGdp) : Par
     this->patchCreationTime = 0;
     this->updatePatchesTime = 0;
 
+    this->trackerTree.build(trackersGdp, NULL);
+
 }
 
 PatchedSurface::~PatchedSurface()
 {
     this->rays.clear();
-}
-
-
-//================================================================================================
-
-//                                     POISSON DISK SAMPLING
-
-//================================================================================================
-
-
-void PatchedSurface::PoissonDiskSampling(GU_Detail *levelSet, GU_Detail *trackersGdp, ParametersDeformablePatches params)
-{
-
-    //This is a function that does a Poisson Disk Sampling using the approach of Bridson 2012 paper
-    //This function is a wrapper to the Bridson2012PoissonDiskDistribution class.
-    //It basically take the points from Houdini and fill it to the approach.
-
-
-    std::clock_t addPoissonDisk;
-    addPoissonDisk = std::clock();
-
-
-    GEO_PointTreeGAOffset trackerTree;
-    trackerTree.build(trackersGdp, NULL);
-    int numberOfInitialTrackers = this->numberOfPatches;
-    cout << this->approachName<<" initial number of point "<<numberOfInitialTrackers<< " "<<endl;
-    //cout << "[Yu2011] we have "<<numberOfPoints << " existing point(s) in trackersGdp"<<endl;
-    Bridson2012PoissonDiskDistribution poissonDiskDistribution;
-    poissonDiskDistribution.PoissonDiskSampling(trackersGdp, trackerTree, levelSet, params.poissonAngleNormalThreshold, params);
-    this->numberOfNewPatches = poissonDiskDistribution.numberOfNewPoints;
-    cout << this->approachName<<" poisson disk sample result: "<< this->numberOfNewPatches<< " new point(s)"<<endl;
-    this->poissondisk += (std::clock() - addPoissonDisk) / (double) CLOCKS_PER_SEC;
-    cout << this->approachName<<" Total :"<<trackersGdp->getNumPoints()<<endl;
-
-}
-
-GA_Offset PatchedSurface::CreateAPatch(GU_Detail *trackersGdp, UT_Vector3 position, UT_Vector3 normal, ParametersDeformablePatches params)
-{
-    //This is a function that does a Poisson Disk Sampling using the approach of Bridson 2012 paper
-    //This function is a wrapper to the Bridson2012PoissonDiskDistribution class.
-    //It basically take the points from Houdini and fill it to the approach.
-
-    std::clock_t addPoissonDisk;
-    addPoissonDisk = std::clock();
-
-
-    GEO_PointTreeGAOffset trackerTree;
-    trackerTree.build(trackersGdp, NULL);
-
-    //cout << "[Yu2011] we have "<<numberOfPoints << " existing point(s) in trackersGdp"<<endl;
-    Bridson2012PoissonDiskDistribution poissonDiskDistribution;
-    int numberOfClosePoint = 0;
-    GA_Offset newPoint = poissonDiskDistribution.CreateAParticle(trackersGdp, trackerTree, position,normal,1,numberOfClosePoint,params);
-
-    cout << this->approachName<<" poisson disk sample "<<trackersGdp->getNumPoints()<< " point(s)"<<endl;
-    //this->numberOfPatches = trackersGdp->getNumPoints();
-
-    this->poissondisk += (std::clock() - addPoissonDisk) / (double) CLOCKS_PER_SEC;
-    return newPoint;
 }
 
 

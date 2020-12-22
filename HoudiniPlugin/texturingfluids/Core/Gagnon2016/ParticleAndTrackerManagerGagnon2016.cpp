@@ -22,15 +22,18 @@
 #include <GEO/GEO_PrimClassifier.h>
 #include <GEO/GEO_PointClassifier.h>
 #include <GEO/GEO_PrimConnector.h>
+#include <GEO/GEO_PrimVDB.h>
 #include <GU/GU_NeighbourList.h>
 #include <GU/GU_RayIntersect.h>
 #include <GU/GU_Flatten.h>
+
+
 
 //#include <Strategies/StrategySurfaceTextureSynthesis.h>
 #include <Core/HoudiniUtils.h>
 
 
-ParticleAndTrackerManagerGagnon2016::ParticleAndTrackerManagerGagnon2016(GU_Detail *surfaceGdp, GU_Detail *trackersGdp)
+ParticleAndTrackerManagerGagnon2016::ParticleAndTrackerManagerGagnon2016(GU_Detail *surfaceGdp, GU_Detail *trackersGdp, ParametersDeformablePatches params)
 {
     this->numberOfPatches = 0;
     this->maxId = 0;
@@ -62,10 +65,14 @@ ParticleAndTrackerManagerGagnon2016::ParticleAndTrackerManagerGagnon2016(GU_Deta
     this->isTangeantTracker = GA_RWHandleI(trackersGdp->addIntTuple(GA_ATTRIB_POINT,"isTrangeantTracker",1));
     this->AttCd = GA_RWHandleV3(trackersGdp->addFloatTuple(GA_ATTRIB_POINT,"Cd", 3));
 
+    this->attNumberOfPrimitives= GA_RWHandleI(trackersGdp->addIntTuple(GA_ATTRIB_POINT,"numberOfPrimitives",1));
 
     this->attVSurface = GA_RWHandleV3(surfaceGdp->addFloatTuple(GA_ATTRIB_POINT,"v", 3));
     this->attDivergence = GA_RWHandleF(trackersGdp->addFloatTuple(GA_ATTRIB_POINT,"divergence",1));
 
+    this->trackersGdp = trackersGdp;
+    this->surface = surfaceGdp;
+    this->params = params;
 
 }
 
@@ -73,6 +80,418 @@ vector<GA_Offset> ParticleAndTrackerManagerGagnon2016::InitializeTrackersAndTang
 {
 
 }
+
+
+vector<GA_Offset> ParticleAndTrackerManagerGagnon2016::PoissonDiskSamplingDistribution(GU_Detail *levelSet, float diskRadius, float angleNormalThreshold)
+{
+    cout << "[Bridson2012PoissonDiskDistributionGagnon2020] on level set using a threshold of "<<angleNormalThreshold<<endl;
+
+    std::clock_t addPoissonDisk;
+    addPoissonDisk = std::clock();
+
+    GA_RWHandleV3   attN(trackersGdp->findFloatTuple(GA_ATTRIB_POINT,"N", 3));
+    GA_RWHandleI    attActive(trackersGdp->addIntTuple(GA_ATTRIB_POINT,"active", 1));
+    GA_RWHandleI    attId(trackersGdp->findIntTuple(GA_ATTRIB_POINT,"id",1));
+    GA_RWHandleI    attDensity(trackersGdp->addIntTuple(GA_ATTRIB_POINT,"density", 1));
+
+
+    vector<GA_Offset> newPoissonDisk;
+
+    this->numberOfNewPoints = 0;
+
+    // Find first vdb primitive of input 0
+    GEO_Primitive* prim;
+    GEO_PrimVDB* phi = 0x0;
+    GA_FOR_ALL_PRIMITIVES(levelSet, prim)
+    {
+        if (phi = dynamic_cast<GEO_PrimVDB*>(prim))
+            break;
+    }
+
+    if (!phi || !phi->hasGrid())
+    {
+        cout << "[Bridson2012PoissonDiskDistributionGagnon2026] Input geometry 0 has no VDB grid!"<<endl;
+        return newPoissonDisk;
+    }
+
+//    cout << "Grid name: " << phi->getGridName() << std::endl;
+//    cout << "Storage type: " << phi->getStorageType() << ", " << phi->getTupleSize() << std::endl;
+//    cout << "JSON: " << phi->getJSON() << std::endl;
+
+    float a = 0.25; //promote this variable to the user interface
+    this->poissonDiskRadius = diskRadius;
+    float killDistance = (1-a)*diskRadius/2;
+
+    cout << "[Bridson2012PoissonDiskDistributionGagnon2026] We have a valid vdb"<<endl;
+
+    GA_RWHandleI    attDeleteFaster(trackersGdp->addIntTuple(GA_ATTRIB_POINT,"deleteFaster", 1));
+    GA_Offset ppt;
+    // Only if we want to delete too close patches, which is not the case when we don't use fading in
+
+    GA_FOR_ALL_PTOFF(trackersGdp,ppt)
+    {
+        int numberOfClosePoint;
+
+        UT_Vector3 pointPosition = trackersGdp->getPos3(ppt);
+        UT_Vector3 pointNormal   = attN.get(ppt);
+        if (attId.get(ppt) > this->maxId)
+            this->maxId = attId.get(ppt);
+
+
+        bool meetPoissonDiskCriterion = this->RespectCriterion(pointPosition, pointNormal, killDistance,  numberOfClosePoint, ppt);
+        attDensity.set(ppt,numberOfClosePoint);
+
+        if (attActive.get(ppt) == 0)
+            continue;
+        //If we have fading in, we are using 2019's approach
+        //if (params.fadingIn == 1)
+        {
+            //attActive.set(ppt,meetPoissonDiskCriterion);
+        }
+        if (!meetPoissonDiskCriterion)
+        {
+            //cout << "We should delete point "<<attId.get(ppt)<<", is in kill distance" <<killDistance<<endl;
+        }
+    }
+
+
+    t = 30;
+
+//    cout << "Grid name: " << phi->getGridName() << std::endl;
+//    cout << "Storage type: " << phi->getStorageType() << ", " << phi->getTupleSize() << std::endl;
+//    cout << "JSON: " << phi->getJSON() << std::endl;
+
+    openvdb::GridBase::Ptr ptr = phi->getGridPtr();
+    openvdb::FloatGrid::Ptr gridSurface = openvdb::gridPtrCast<openvdb::FloatGrid>(ptr);
+    if(!gridSurface)
+    {
+        cout << "[Bridson2012PoissonDiskDistributionGagnon2026] Surface grid can't be converted in FloatGrid"<<endl;
+        return newPoissonDisk;
+    }
+    if ((gridSurface->getGridClass() != openvdb::GRID_LEVEL_SET))
+    {
+        cout<< "[Bridson2012PoissonDiskDistributionGagnon2026] Surface grid is not a Level-set FloatGrid!"<<endl;
+        return newPoissonDisk;
+    }
+
+    //=================================================================
+    //                         OPEN VDB ACCESSORS
+    //=================================================================
+
+    // Create the gradient field
+    openvdb::tools::Gradient<openvdb::FloatGrid> gradientOperator(*gridSurface);
+    openvdb::VectorGrid::ConstPtr gridGradient = gradientOperator.process();
+    //gridGradient->setName(ssGrad.str());
+    openvdb::VectorGrid::ConstAccessor accessorGradient = gridGradient->getConstAccessor();
+    openvdb::tools::GridSampler<openvdb::VectorGrid::ConstAccessor, openvdb::tools::BoxSampler>
+            samplerGradient(accessorGradient, gridGradient->transform());
+     // Get the sampler for the boundary grid (tri-linear filtering, in surface grid index space)
+    openvdb::FloatGrid::Accessor accessorSurface = gridSurface->getAccessor();
+    openvdb::tools::GridSampler<openvdb::FloatGrid::Accessor, openvdb::tools::BoxSampler>
+            samplerSurface(accessorSurface, gridSurface->transform());
+
+    //=================================================================
+    // 1: for all grid cells C where φ changes sign do
+    //=================================================================
+    int nbOfCell = 0;
+
+    //cout << "[Bridson2012PoissonDiskDistributionGagnon2026] Step 1: for all grid cells C where φ changes sign do"<<endl;
+    for (openvdb::FloatGrid::ValueOnCIter gridCellIt = gridSurface->cbeginValueOn(); gridCellIt; ++gridCellIt)
+    {
+
+
+        float x = gridCellIt.getCoord().x();
+        float y = gridCellIt.getCoord().y();
+        float z = gridCellIt.getCoord().z();
+
+        float offset = 0.5;
+
+        openvdb::Vec3f cellPosition(x,y,z);
+        openvdb::Vec3f worldCellPos = gridSurface->transform().indexToWorld(cellPosition);
+        float boundaryDist = samplerSurface.wsSample(worldCellPos);
+        //openvdb::Vec3f p    = it.getCoord();
+        //if (boundaryDist <= 0.0)// && grad.length() > 0.0)
+        {
+            //if it is not close to the surface, continue
+            if (abs(boundaryDist) > params.CellSize/2.0f) // We should use a threshold defined by the user
+                continue;
+            //=================================================================
+            //2:  for t attempts do
+            //=================================================================
+            bool ableToInsertPoint = false;
+            for(int i =0; i < t; i++)
+            {
+                //=================================================================
+                //3:      Generate random point p in C
+                //=================================================================
+                int seed = i;
+                //we want it to oscillate between -0.5 and 0.5
+
+                srand(seed);
+                float rx = (((double) rand()/(RAND_MAX)-offset));
+                srand(seed+1);
+                float ry = (((double) rand()/(RAND_MAX)-offset));
+                srand(seed+2);
+                float rz = (((double) rand()/(RAND_MAX)-offset));
+
+                openvdb::Vec3f randomPosition(rx,ry,rz);
+                randomPosition *= params.CellSize;
+
+                openvdb::Vec3f p = worldCellPos+randomPosition;
+
+                float newPointDistance = samplerSurface.wsSample(p);
+                if (abs(newPointDistance) > params.poissondiskradius)
+                {
+                    //cout << "random point is outside of range"<<endl;
+                    continue;
+                }
+                //cout << "abs(newPointDistance) > poissonDiskRadius"<<endl;
+                //=================================================================
+                //4:      Project p to surface of φ
+                //=================================================================
+                openvdb::Vec3f grad = samplerGradient.wsSample(p);
+                if (grad.length() < 0.0001)
+                    continue;
+                openvdb::Vec3f poissonDisk = projectPointOnLevelSet(p,newPointDistance,grad);
+                UT_Vector3 newPointPosition = UT_Vector3(poissonDisk.x(),poissonDisk.y(),poissonDisk.z());
+                grad.normalize();
+                UT_Vector3 newPointNormal = UT_Vector3(grad.x(),grad.y(),grad.z());
+
+                //=================================================================
+                //5:      if p meets the Poisson Disk criterion in S then
+                //=================================================================
+                int numberOfClosePoint;
+                //cout << "Trying to fit "<<newPointPosition<<endl;
+                bool meetPoissonDiskCriterion = this->RespectCriterion(newPointPosition, newPointNormal, poissonDiskRadius, numberOfClosePoint, -1);
+                if (meetPoissonDiskCriterion)
+                {
+                    //=================================================================
+                    //6:          S ← S ∪ {p}
+                    //=================================================================
+
+                    GA_Offset newPoint = this->CreateAParticle(newPointPosition, newPointNormal);
+                    newPoissonDisk.push_back(newPoint);
+                    break;
+                }
+            }
+            if (!ableToInsertPoint)
+            {
+                //cout << "after "<<t<<" attemps, there is no possible insertion."<<endl;
+            }
+        }
+        nbOfCell++;
+    }
+    this->numberOfNewPatches = this->numberOfNewPoints;
+    cout << this->approachName<<"[Bridson2012PoissonDiskDistributionGagnon2026] poisson disk sample result: "<< this->numberOfNewPatches<< " new point(s)"<<endl;
+    this->poissondisk += (std::clock() - addPoissonDisk) / (double) CLOCKS_PER_SEC;
+    cout << this->approachName<<"[Bridson2012PoissonDiskDistributionGagnon2026] Total :"<<trackersGdp->getNumPoints()<<endl;
+    cout << "[Bridson2012PoissonDiskDistributionGagnon2026] "<< nbOfCell <<  "cells have been treated."<<endl;
+    return newPoissonDisk;
+}
+
+
+//================================================================================================
+
+//                                 PROJECT POINT ON LEVEL SET
+
+//================================================================================================
+
+
+openvdb::Vec3f ParticleAndTrackerManagerGagnon2016::projectPointOnLevelSet(openvdb::Vec3f point, float distance, openvdb::Vec3f grad)
+{
+    //get the norm of the gradient
+    openvdb::Vec3f gradNorm = grad;
+    gradNorm.normalize();
+
+    //=================================================================
+    //4:      Project p to surface of φ
+    //=================================================================
+    //projection
+    //cout << "old p "<<p<<endl;
+    //p = p - dist * (grad/gradNorm);
+    point = point - distance * gradNorm;
+
+    return point;
+}
+
+bool ParticleAndTrackerManagerGagnon2016::RespectCriterion(UT_Vector3 newPointPosition, UT_Vector3 newPointNormal, float killDistance, int &numberOfClosePoint,   GA_Offset exclude )
+{
+    numberOfClosePoint = 0;
+
+    GA_RWHandleV3   attN(trackersGdp->addFloatTuple(GA_ATTRIB_POINT,"N", 3));
+    GA_RWHandleI    attActive(trackersGdp->findIntTuple(GA_ATTRIB_POINT,"active", 1));
+
+    GEO_PointTreeGAOffset::IdxArrayType close_particles_indices;
+
+    this->trackerTree.findAllCloseIdx(newPointPosition,
+                         params.poissondiskradius*2,
+                         close_particles_indices);
+
+    int l = (int)close_particles_indices.entries();
+    GA_Offset neighbor;
+    bool tooClose = false;
+
+    float cs    = params.CellSize;
+    float r     = params.poissondiskradius;
+
+    newPointNormal.normalize();
+    float kd = killDistance;
+
+    UT_Vector3 defaultDirection(1.012f,0.123f,0.002f);
+    UT_Vector3 S,T;
+
+    for(int j=0; j<l;j++)
+    {
+        neighbor = close_particles_indices.array()[j];
+        if (attActive.get(neighbor) == 0)
+            continue;
+        if (neighbor == exclude)
+            continue;
+
+        UT_Vector3 pos          = trackersGdp->getPos3(neighbor);
+
+        UT_Vector3 N            = attN.get(neighbor);
+        N.normalize();
+        S = cross(N,defaultDirection);
+        S.normalize();
+        T = cross(S,N);
+        T.normalize();
+
+
+        // Transform into local patch space (where STN is aligned with XYZ at the origin)
+        const UT_Vector3 relativePosistion = pos - newPointPosition;
+        UT_Vector3 poissonDiskSpace;
+        poissonDiskSpace.x() = relativePosistion.dot(S);
+        poissonDiskSpace.y() = relativePosistion.dot(T);
+        poissonDiskSpace.z() = relativePosistion.dot(N);
+
+        float dotN              = dot(N,newPointNormal);
+        bool samePlane          = dotN > params.poissonAngleNormalThreshold;
+
+        //(x/a)2 + (y/b)2 + (z/c)2 = 1
+        float x = poissonDiskSpace.x();
+        float y = poissonDiskSpace.y();
+        float z = poissonDiskSpace.z();
+        float a = r;
+        float b = r;
+        float c = cs*2;
+
+        float a2 = kd;
+        float b2 = kd;
+        float c2 = cs;
+
+        float smallEllipse = (x/a2)*(x/a2) + (y/b2)*(y/b2) + (z/c2)*(z/c2);
+        float bigEllipse = (x/a)*(x/a) + (y/b)*(y/b) + (z/c)*(z/c);
+
+        bool outsideOfSmallEllipse = false;
+        bool insideBigEllipse = false;
+
+        if (bigEllipse <= 1)
+            insideBigEllipse = true;
+        if (smallEllipse > 1)
+            outsideOfSmallEllipse = true;
+
+        //It is too close to the current point ?
+        if(samePlane && !outsideOfSmallEllipse)
+        {
+            tooClose = true;
+        }
+
+        if(insideBigEllipse && samePlane)
+            numberOfClosePoint++;
+    }
+    return !tooClose;
+}
+
+
+GA_Offset ParticleAndTrackerManagerGagnon2016::CreateAParticle(UT_Vector3 p, UT_Vector3 N)
+{
+
+    cout << "[ParticleAndTrackerManagerGagnon2016] Create a particle."<<endl;
+    GA_RWHandleF    attExistingLife(trackersGdp->addFloatTuple(GA_ATTRIB_POINT,"life", 1));
+
+    int divider = 1;
+    if (params.useTangeantTracker == 1)
+        divider = 2;
+    if (trackersGdp->getNumPoints()/divider > this->maxId) //existing points
+    {
+        //cout << "New Max Id = "<<trackersGdp->getNumPoints()/divider<<endl;
+        this->maxId = trackersGdp->getNumPoints()/divider;
+    }
+    int id = this->maxId+1;
+    this->maxId = id;
+    cout << "New Max Id = "<<this->maxId<<endl;
+    GA_Offset newPoint = trackersGdp->appendPoint();
+    trackersGdp->setPos3(newPoint, p);
+    attN.set(newPoint,N);
+    attActive.set(newPoint,true);
+    attId.set(newPoint,id);
+    attSpawn.set(newPoint,0);
+    attLife.set(newPoint,0.001f);
+    attNumberOfPrimitives.set(newPoint,0);
+    attIsMature.set(newPoint,0);
+    attMaxDeltaOnD.set(newPoint,0);
+    cout << "Set random color"<<endl;
+    UT_Vector3 patchColor = this->SetRandomColor(id);
+    AttCd.set(newPoint,patchColor);
+
+    //---------- Tangeant Tracker -----------
+    UT_Vector3 defaultDirection(1,0,0);
+    UT_Vector3 S,T;
+    float Tlenght = params.poissondiskradius/2.0f;
+    GA_Offset tracker_offset;
+
+
+    cout << "Add tangeant tracker"<<endl;
+    GA_RWHandleI    isTangeantTracker(trackersGdp->addIntTuple(GA_ATTRIB_POINT, "isTrangeantTracker",1));
+    //---------- ADD TANGEANT TRACKER ----------
+    //cout << "Add Tangeant Tracker"<<endl;
+    //put this in a function, and/or move this where we already add point
+    S = cross(N,defaultDirection);
+    S.normalize();
+    T = cross(S,N);
+    T.normalize();
+    UT_Vector3 translation = T*Tlenght;
+    //cout << "Translation: "<<translation<<endl;
+    UT_Vector3 tangeantPosition = p + translation;
+    //cout << "adding tangeant tracker"<<endl;
+    tracker_offset = trackersGdp->appendPoint();
+    isTangeantTracker.set(tracker_offset,1);
+    attId.set(tracker_offset,id);
+    trackersGdp->setPos3(tracker_offset,tangeantPosition);
+
+
+    //cout << "Ending adding particule."<<endl;
+    if(params.startFrame == params.frame)
+    {
+        attExistingLife.set(newPoint,params.fadingTau);
+    }
+
+    if(params.startFrame == params.frame)
+    {
+        attLife.set(newPoint,params.fadingTau);
+    }
+    this->trackerTree.build(trackersGdp);
+
+    this->numberOfNewPoints++;
+
+    return newPoint;
+}
+
+UT_Vector3 ParticleAndTrackerManagerGagnon2016::SetRandomColor(int patchNumber)
+{
+    //initialize random seed
+    srand(patchNumber);
+    float r = ((double) rand()/(RAND_MAX));
+    srand(patchNumber+1);
+    float g = ((double) rand()/(RAND_MAX));
+    srand(patchNumber+2);
+    float b = ((double) rand()/(RAND_MAX));
+    UT_Vector3 patchColor(r,g,b);
+
+    return patchColor;
+}
+
 
 //================================================================================================
 

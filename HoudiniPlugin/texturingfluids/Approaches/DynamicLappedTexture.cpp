@@ -25,7 +25,10 @@
 #include <GU/GU_RayIntersect.h>
 
 #include <Core/Gagnon2016/LappedSurfaceGagnon2016.h>
-#include <Core/Gagnon2016/Bridson2012PoissonDiskDistribution.h>
+
+
+// random generator function:
+int myrandom (GA_Offset i) { return std::rand()%i;}
 
 DynamicLappedTexture::DynamicLappedTexture()
 {
@@ -37,7 +40,7 @@ DynamicLappedTexture::~DynamicLappedTexture()
 
 void DynamicLappedTexture::Synthesis(GU_Detail *surfaceGdp, GU_Detail *trackersGdp, GU_Detail *levelSet, ParametersDeformablePatches params)
 {
-    LappedSurfaceGagnon2016 surface(surfaceGdp, trackersGdp);
+    LappedSurfaceGagnon2016 surface(surfaceGdp, trackersGdp, params);
     cout << "[DynamicLappedTexture::Synthesis] "<<params.frame<<endl;
     //params.useDynamicTau = false;
 
@@ -57,21 +60,39 @@ void DynamicLappedTexture::Synthesis(GU_Detail *surfaceGdp, GU_Detail *trackersG
 
     GEO_PointTreeGAOffset surfaceTree;
     surfaceTree.build(surfaceGdp, NULL);
+    vector<GA_Offset> newPatchesPoints;
+    GA_RWHandleI    attId(trackersGdp->findIntTuple(GA_ATTRIB_POINT,"id",1));
 
     //=========================== CORE ALGORITHM ============================
+    bool shufflePatchIds = true; //When this is true, we have a weird texture synthesis artifacté
 
     if(params.startFrame == params.frame)
     {
-        surface.PoissonDiskSampling(levelSet,trackersGdp,params);
-        //surface.ShufflePoints(trackersGdp);
 
-
+        newPatchesPoints = surface.PoissonDiskSamplingDistribution(levelSet,params.poissondiskradius, params.poissonAngleNormalThreshold);
+        if (shufflePatchIds)
+        {
+            std::srand ( unsigned ( std::time(0) ) );
+            vector<GA_Offset>::iterator itPoint;
+            cout << "random shuffle offset values"<<endl;
+            std::random_shuffle ( newPatchesPoints.begin(), newPatchesPoints.end(), myrandom);
+            int index = 0;
+            for (itPoint = newPatchesPoints.begin(); itPoint != newPatchesPoints.end(); itPoint++)
+            {
+                index++;
+                GA_Offset newPoint = *itPoint;
+                attId.set(newPoint,index);
+                // taking the next point offset which is supposed to the tangeant tracker.
+                GA_Offset tangeantNewPoint = newPoint + 1;
+                attId.set(tangeantNewPoint, index);
+            }
+        }
     }
     else
     {
         surface.AdvectTrackersAndTangeants(surfaceGdp, trackersGdp, params);
         surface.UpdateTrackersAndTangeant(surfaceGdp,trackersGdp, surfaceGroup,params);
-        surface.PoissonDiskSampling(levelSet,trackersGdp,params);
+        surface.PoissonDiskSamplingDistribution(levelSet,params.poissondiskradius, params.poissonAngleNormalThreshold);
     }
 
     surface.CreateAndUpdateTrackersBasedOnPoissonDisk(surfaceGdp,trackersGdp,surfaceGroup,params);

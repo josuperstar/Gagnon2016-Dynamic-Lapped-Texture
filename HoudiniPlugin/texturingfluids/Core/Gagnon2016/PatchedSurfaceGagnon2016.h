@@ -15,16 +15,13 @@ class PatchedSurface : public ParticleAndTrackerManagerGagnon2016
 {
 public:
 
-    PatchedSurface(GU_Detail *surface, GU_Detail *trackersGdp);
+    PatchedSurface(GU_Detail *surface, GU_Detail *trackersGdp, ParametersDeformablePatches params);
     ~PatchedSurface();
 
-    void PoissonDiskSampling(GU_Detail *surfaceGdp, GU_Detail *trackers, ParametersDeformablePatches params);
+
     void AddDeformablePatcheUsingBarycentricCoordinates(GU_Detail *deformableGridsGdp,GU_Detail *surfaceGdp, GU_Detail *trackersGdp, GA_Offset ppt, ParametersDeformablePatches params, GEO_PointTreeGAOffset &surfaceTree,  GU_RayIntersect &ray);
     void AddDeformablePatchesUsingBarycentricCoordinates(GU_Detail *gdp, GU_Detail* surface, GU_Detail *trackersGdp, ParametersDeformablePatches params,  GEO_PointTreeGAOffset &surfaceTree, GU_RayIntersect &ray);
     void DeleteUnusedPatches(GU_Detail *gdp, GU_Detail *trackersGdp, ParametersDeformablePatches params);
-
-    //for test purpose
-    GA_Offset CreateAPatch(GU_Detail *trackers, UT_Vector3 position, UT_Vector3 normal, ParametersDeformablePatches params);
 
     double poissondisk;
     double  patchCreationTime;
