@@ -15,7 +15,7 @@ class PatchedSurface : public ParticleAndTrackerManagerGagnon2016
 {
 public:
 
-    PatchedSurface(GU_Detail *surface, GU_Detail *trackersGdp, ParametersDeformablePatches params);
+    PatchedSurface(GU_Detail *surface, GA_PointGroup *surfaceGroup, GU_Detail *trackersGdp, ParametersDeformablePatches params);
     ~PatchedSurface();
 
 

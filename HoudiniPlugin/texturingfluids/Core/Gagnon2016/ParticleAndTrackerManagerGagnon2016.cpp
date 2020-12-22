@@ -33,7 +33,7 @@
 #include <Core/HoudiniUtils.h>
 
 
-ParticleAndTrackerManagerGagnon2016::ParticleAndTrackerManagerGagnon2016(GU_Detail *surfaceGdp, GU_Detail *trackersGdp, ParametersDeformablePatches params)
+ParticleAndTrackerManagerGagnon2016::ParticleAndTrackerManagerGagnon2016(GU_Detail *surfaceGdp, GA_PointGroup *surfaceGroup, GU_Detail *trackersGdp, ParametersDeformablePatches params)
 {
     this->numberOfPatches = 0;
     this->maxId = 0;
@@ -71,12 +71,13 @@ ParticleAndTrackerManagerGagnon2016::ParticleAndTrackerManagerGagnon2016(GU_Deta
     this->attDivergence = GA_RWHandleF(trackersGdp->addFloatTuple(GA_ATTRIB_POINT,"divergence",1));
 
     this->trackersGdp = trackersGdp;
-    this->surface = surfaceGdp;
+    this->surfaceGdp = surfaceGdp;
     this->params = params;
+    this->surfaceGroup = surfaceGroup;
 
 }
 
-vector<GA_Offset> ParticleAndTrackerManagerGagnon2016::InitializeTrackersAndTangeants(GU_Detail* surface,GU_Detail *trackers, GA_PointGroup *surfaceGroup, ParametersDeformablePatches params)
+vector<GA_Offset> ParticleAndTrackerManagerGagnon2016::InitializeTrackersAndTangeants()
 {
 
 }
@@ -407,7 +408,7 @@ bool ParticleAndTrackerManagerGagnon2016::RespectCriterion(UT_Vector3 newPointPo
 GA_Offset ParticleAndTrackerManagerGagnon2016::CreateAParticle(UT_Vector3 p, UT_Vector3 N)
 {
 
-    cout << "[ParticleAndTrackerManagerGagnon2016] Create a particle."<<endl;
+    //cout << "[ParticleAndTrackerManagerGagnon2016] Create a particle."<<endl;
     GA_RWHandleF    attExistingLife(trackersGdp->addFloatTuple(GA_ATTRIB_POINT,"life", 1));
 
     int divider = 1;
@@ -420,7 +421,7 @@ GA_Offset ParticleAndTrackerManagerGagnon2016::CreateAParticle(UT_Vector3 p, UT_
     }
     int id = this->maxId+1;
     this->maxId = id;
-    cout << "New Max Id = "<<this->maxId<<endl;
+    //cout << "New Max Id = "<<this->maxId<<endl;
     GA_Offset newPoint = trackersGdp->appendPoint();
     trackersGdp->setPos3(newPoint, p);
     attN.set(newPoint,N);
@@ -431,7 +432,7 @@ GA_Offset ParticleAndTrackerManagerGagnon2016::CreateAParticle(UT_Vector3 p, UT_
     attNumberOfPrimitives.set(newPoint,0);
     attIsMature.set(newPoint,0);
     attMaxDeltaOnD.set(newPoint,0);
-    cout << "Set random color"<<endl;
+    //cout << "Set random color"<<endl;
     UT_Vector3 patchColor = this->SetRandomColor(id);
     AttCd.set(newPoint,patchColor);
 
@@ -442,7 +443,7 @@ GA_Offset ParticleAndTrackerManagerGagnon2016::CreateAParticle(UT_Vector3 p, UT_
     GA_Offset tracker_offset;
 
 
-    cout << "Add tangeant tracker"<<endl;
+    //cout << "Add tangeant tracker"<<endl;
     GA_RWHandleI    isTangeantTracker(trackersGdp->addIntTuple(GA_ATTRIB_POINT, "isTrangeantTracker",1));
     //---------- ADD TANGEANT TRACKER ----------
     //cout << "Add Tangeant Tracker"<<endl;
@@ -500,12 +501,12 @@ UT_Vector3 ParticleAndTrackerManagerGagnon2016::SetRandomColor(int patchNumber)
 //================================================================================================
 
 
-void ParticleAndTrackerManagerGagnon2016::CreateAndUpdateTrackersBasedOnPoissonDisk(GU_Detail *surface, GU_Detail *trackersGdp, GA_PointGroup *surfaceGroup,  ParametersDeformablePatches params)
+void ParticleAndTrackerManagerGagnon2016::CreateAndUpdateTrackersBasedOnPoissonDisk()
 {
 
     cout << "[ParticleAndTrackerManagerGagnon2016] CreateTrackersBasedOnPoissonDisk"<<endl;
 
-    if (surfaceGroup == 0x0)
+    if (this->surfaceGroup == 0x0)
         return;
 
     GA_PointGroup *markerGrp = (GA_PointGroup *)trackersGdp->pointGroups().find(this->markerGroupName.c_str());
@@ -526,7 +527,7 @@ void ParticleAndTrackerManagerGagnon2016::CreateAndUpdateTrackersBasedOnPoissonD
     float thresholdDistance = params.maximumProjectionDistance;
 
     GU_MinInfo mininfo;
-    GU_RayIntersect ray(surface);
+    GU_RayIntersect ray(surfaceGdp);
     ray.init();
 
     int id = 0;
@@ -571,21 +572,21 @@ void ParticleAndTrackerManagerGagnon2016::CreateAndUpdateTrackersBasedOnPoissonD
             GA_Offset primOffset = mininfo.prim->getMapOffset();
             float u = mininfo.u1;
             float v = mininfo.v1;
-            GEO_Primitive *prim = surface->getGEOPrimitive(primOffset);
+            GEO_Primitive *prim = surfaceGdp->getGEOPrimitive(primOffset);
 
             GA_Offset vertexOffset0 = prim->getVertexOffset(0);
 
-            GA_Offset pointOffset0  = surface->vertexPoint(vertexOffset0);
+            GA_Offset pointOffset0  = surfaceGdp->vertexPoint(vertexOffset0);
             UT_Vector3 n0 = refAttN.get(pointOffset0);
             UT_Vector3 v0 = refAttV.get(pointOffset0);
 
             GA_Offset vertexOffset1 = prim->getVertexOffset(1);
-            GA_Offset pointOffset1  = surface->vertexPoint(vertexOffset1);
+            GA_Offset pointOffset1  = surfaceGdp->vertexPoint(vertexOffset1);
             UT_Vector3 n1 = refAttN.get(pointOffset1);
             UT_Vector3 v1 = refAttV.get(pointOffset1);
 
             GA_Offset vertexOffset2 = prim->getVertexOffset(2);
-            GA_Offset pointOffset2  = surface->vertexPoint(vertexOffset2);
+            GA_Offset pointOffset2  = surfaceGdp->vertexPoint(vertexOffset2);
             UT_Vector3 n2 = refAttN.get(pointOffset2);
             UT_Vector3 v2 = refAttV.get(pointOffset2);
 
@@ -634,7 +635,7 @@ void ParticleAndTrackerManagerGagnon2016::CreateAndUpdateTrackersBasedOnPoissonD
 //================================================================================================
 
 
-void ParticleAndTrackerManagerGagnon2016::UpdateTrackersAndTangeant(GU_Detail *surface, GU_Detail *trackersGdp, GA_PointGroup *surfaceGroup,  ParametersDeformablePatches params)
+void ParticleAndTrackerManagerGagnon2016::UpdateTrackersAndTangeant()
 {
 
     bool useDynamicTau = params.useDynamicTau;
@@ -662,7 +663,7 @@ void ParticleAndTrackerManagerGagnon2016::UpdateTrackersAndTangeant(GU_Detail *s
     float thresholdDistance = params.maximumProjectionDistance;
 
     GU_MinInfo mininfo;
-    GU_RayIntersect ray(surface);
+    GU_RayIntersect ray(surfaceGdp);
     ray.init();
 
     int id = 0;
@@ -715,21 +716,21 @@ void ParticleAndTrackerManagerGagnon2016::UpdateTrackersAndTangeant(GU_Detail *s
             GA_Offset primOffset = mininfo.prim->getMapOffset();
             float u = mininfo.u1;
             float v = mininfo.v1;
-            GEO_Primitive *prim = surface->getGEOPrimitive(primOffset);
+            GEO_Primitive *prim = surfaceGdp->getGEOPrimitive(primOffset);
 
             GA_Offset vertexOffset0 = prim->getVertexOffset(0);
 
-            GA_Offset pointOffset0  = surface->vertexPoint(vertexOffset0);
+            GA_Offset pointOffset0  = surfaceGdp->vertexPoint(vertexOffset0);
             UT_Vector3 n0 = refAttN.get(pointOffset0);
             UT_Vector3 v0 = refAttV.get(pointOffset0);
 
             GA_Offset vertexOffset1 = prim->getVertexOffset(1);
-            GA_Offset pointOffset1  = surface->vertexPoint(vertexOffset1);
+            GA_Offset pointOffset1  = surfaceGdp->vertexPoint(vertexOffset1);
             UT_Vector3 n1 = refAttN.get(pointOffset1);
             UT_Vector3 v1 = refAttV.get(pointOffset1);
 
             GA_Offset vertexOffset2 = prim->getVertexOffset(2);
-            GA_Offset pointOffset2  = surface->vertexPoint(vertexOffset2);
+            GA_Offset pointOffset2  = surfaceGdp->vertexPoint(vertexOffset2);
             UT_Vector3 n2 = refAttN.get(pointOffset2);
             UT_Vector3 v2 = refAttV.get(pointOffset2);
 
@@ -810,7 +811,7 @@ void ParticleAndTrackerManagerGagnon2016::UpdateTrackersAndTangeant(GU_Detail *s
 //================================================================================================
 
 
-void ParticleAndTrackerManagerGagnon2016::AdvectSingleTrackers(GU_Detail *surfaceGdp,GU_Detail *trackersGdp, ParametersDeformablePatches params)
+void ParticleAndTrackerManagerGagnon2016::AdvectSingleTrackers()
 {
     cout <<this->approachName<< " Advect Markers"<<endl;
 
@@ -969,7 +970,7 @@ void ParticleAndTrackerManagerGagnon2016::AdvectSingleTrackers(GU_Detail *surfac
 //================================================================================================
 
 
-void ParticleAndTrackerManagerGagnon2016::AdvectTrackersAndTangeants(GU_Detail *surfaceGdp, GU_Detail *trackersGdp, ParametersDeformablePatches params)
+void ParticleAndTrackerManagerGagnon2016::AdvectTrackersAndTangeants()
 {
     cout <<this->approachName<< " Advect Trackers And Tangeants"<<endl;
 
@@ -1150,7 +1151,7 @@ void ParticleAndTrackerManagerGagnon2016::AdvectTrackersAndTangeants(GU_Detail *
 
 //================================================================================================
 
-void ParticleAndTrackerManagerGagnon2016::ComputeDensity(GU_Detail *surfaceGdp, GU_Detail *trackers, ParametersDeformablePatches params, GEO_PointTreeGAOffset &tree)
+void ParticleAndTrackerManagerGagnon2016::ComputeDensity()
 {
 
     cout <<this->approachName<< " Compute Density"<<endl;
@@ -1159,19 +1160,19 @@ void ParticleAndTrackerManagerGagnon2016::ComputeDensity(GU_Detail *surfaceGdp, 
 
     float epsilon = 0.001;
 
-    GA_RWHandleI attDensity(trackers->addIntTuple(GA_ATTRIB_POINT,"density",1));
+    GA_RWHandleI attDensity(trackersGdp->addIntTuple(GA_ATTRIB_POINT,"density",1));
 
     //GA_RWHandleV3 attV(trackers->addFloatTuple(GA_ATTRIB_POINT,"v", 3));
     float patchRadius = params.poissondiskradius;
     GA_Offset ppt;
 
-    GA_FOR_ALL_PTOFF(trackers,ppt)
+    GA_FOR_ALL_PTOFF(trackersGdp,ppt)
     {
 
-        p = trackers->getPos3(ppt);
+        p = trackersGdp->getPos3(ppt);
 
         GEO_PointTreeGAOffset::IdxArrayType close_particles_indices;
-        tree.findAllCloseIdx(p,
+        trackerTree.findAllCloseIdx(p,
                              patchRadius,
                              close_particles_indices);
 
@@ -1190,7 +1191,7 @@ void ParticleAndTrackerManagerGagnon2016::ComputeDensity(GU_Detail *surfaceGdp, 
 
 //================================================================================================
 
-void ParticleAndTrackerManagerGagnon2016::ComputeDivergence(GU_Detail *surfaceGdp, GU_Detail *trackers, ParametersDeformablePatches params, GEO_PointTreeGAOffset &tree)
+void ParticleAndTrackerManagerGagnon2016::ComputeDivergence()
 {
 
     cout <<this->approachName<< " Compute Divergence"<<endl;
@@ -1204,7 +1205,7 @@ void ParticleAndTrackerManagerGagnon2016::ComputeDivergence(GU_Detail *surfaceGd
     float patchRadius = params.poissondiskradius*3;
     GA_Offset ppt;
 
-    GA_FOR_ALL_PTOFF(trackers,ppt)
+    GA_FOR_ALL_PTOFF(trackersGdp,ppt)
     {
         v = attV.get(ppt);
         v.normalize();
@@ -1212,10 +1213,10 @@ void ParticleAndTrackerManagerGagnon2016::ComputeDivergence(GU_Detail *surfaceGd
         float sumDotWeighted = 0;
         float w_k = 0;
 
-        p = trackers->getPos3(ppt);
+        p = trackersGdp->getPos3(ppt);
 
         GEO_PointTreeGAOffset::IdxArrayType close_particles_indices;
-        tree.findAllCloseIdx(p,
+        surfaceTree.findAllCloseIdx(p,
                              patchRadius,
                              close_particles_indices);
 

@@ -15,14 +15,13 @@ class LappedSurfaceGagnon2016 : public ParticleAndTrackerManagerGagnon2016
 {
 public:
 
-    LappedSurfaceGagnon2016(GU_Detail *surface, GU_Detail *trackersGdp, ParametersDeformablePatches params);
+    LappedSurfaceGagnon2016(GU_Detail *surface, GA_PointGroup *surfaceGroup, GU_Detail *trackersGdp, ParametersDeformablePatches params);
     ~LappedSurfaceGagnon2016();
 
-    void AddSolidPatchesUsingBarycentricCoordinates(GU_Detail* surface, GU_Detail *trackersGdp, ParametersDeformablePatches params,  GEO_PointTreeGAOffset &surfaceTree);
-    void ShufflePoints(GU_Detail *trackers);
-    void OrthogonalUVProjection(GU_Detail* surface, GU_Detail *trackersGdp, ParametersDeformablePatches params);
-    void DeleteUnusedPatches(GU_Detail *gdp, GU_Detail *trackersGdp, ParametersDeformablePatches params);
-    void FillSurfaceHoles(GU_Detail *surfaceGdp, GU_Detail *trackers, ParametersDeformablePatches params);
+    void AddSolidPatchesUsingBarycentricCoordinates();
+    void OrthogonalUVProjection();
+    void DeleteUnusedPatches();
+    void FillSurfaceHoles();
 
     double poissondisk;
     double  patchCreationTime;
@@ -47,6 +46,8 @@ private :
     //---------------------------------------------
 
     map<string,GU_RayIntersect*> rays;
+
+
 
 
 };

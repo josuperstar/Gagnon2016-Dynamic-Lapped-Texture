@@ -27,7 +27,7 @@
 #include <Core/HoudiniUtils.h>
 
 
-PatchedSurface::PatchedSurface(GU_Detail *surface, GU_Detail *trackersGdp, ParametersDeformablePatches params) : ParticleAndTrackerManagerGagnon2016(surface, trackersGdp, params)
+PatchedSurface::PatchedSurface(GU_Detail *surface, GA_PointGroup *surfaceGroup, GU_Detail *trackersGdp, ParametersDeformablePatches params) : ParticleAndTrackerManagerGagnon2016(surface, surfaceGroup, trackersGdp, params)
 {
     //this->numberOfPatches = 0;
 
@@ -134,6 +134,7 @@ PatchedSurface::PatchedSurface(GU_Detail *surface, GU_Detail *trackersGdp, Param
     this->patchCreationTime = 0;
     this->updatePatchesTime = 0;
 
+    cout << "[PatchedSurface] Buildiong trackers tree"<<endl;
     this->trackerTree.build(trackersGdp, NULL);
 
 }

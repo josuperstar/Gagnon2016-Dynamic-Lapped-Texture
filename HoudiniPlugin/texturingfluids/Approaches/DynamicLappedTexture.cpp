@@ -40,7 +40,16 @@ DynamicLappedTexture::~DynamicLappedTexture()
 
 void DynamicLappedTexture::Synthesis(GU_Detail *surfaceGdp, GU_Detail *trackersGdp, GU_Detail *levelSet, ParametersDeformablePatches params)
 {
-    LappedSurfaceGagnon2016 surface(surfaceGdp, trackersGdp, params);
+
+    const string surfaceGroupName = "surface";
+    GA_PointGroup *surfaceGroup = (GA_PointGroup *)surfaceGdp->pointGroups().find(surfaceGroupName.c_str());
+    if (surfaceGroup == 0x0)
+    {
+        cout << "There is no surface group to synthesis"<<endl;
+        return;
+    }
+
+    LappedSurfaceGagnon2016 surface(surfaceGdp, surfaceGroup, trackersGdp, params);
     cout << "[DynamicLappedTexture::Synthesis] "<<params.frame<<endl;
     //params.useDynamicTau = false;
 
@@ -50,12 +59,7 @@ void DynamicLappedTexture::Synthesis(GU_Detail *surfaceGdp, GU_Detail *trackersG
     const GA_SaveOptions *options;
     UT_StringArray *errors;
 
-    GA_PointGroup *surfaceGroup = (GA_PointGroup *)surfaceGdp->pointGroups().find(surface.surfaceGroupName.c_str());
-    if (surfaceGroup == 0x0)
-    {
-        cout << "There is no surface group to synthesis"<<endl;
-        return;
-    }
+
     //=======================================================
 
     GEO_PointTreeGAOffset surfaceTree;
@@ -64,7 +68,7 @@ void DynamicLappedTexture::Synthesis(GU_Detail *surfaceGdp, GU_Detail *trackersG
     GA_RWHandleI    attId(trackersGdp->findIntTuple(GA_ATTRIB_POINT,"id",1));
 
     //=========================== CORE ALGORITHM ============================
-    bool shufflePatchIds = true; //When this is true, we have a weird texture synthesis artifacté
+    bool shufflePatchIds = false; //When this is true, we have a weird texture synthesis artifacté
 
     if(params.startFrame == params.frame)
     {
@@ -90,15 +94,15 @@ void DynamicLappedTexture::Synthesis(GU_Detail *surfaceGdp, GU_Detail *trackersG
     }
     else
     {
-        surface.AdvectTrackersAndTangeants(surfaceGdp, trackersGdp, params);
-        surface.UpdateTrackersAndTangeant(surfaceGdp,trackersGdp, surfaceGroup,params);
+        surface.AdvectTrackersAndTangeants();
+        surface.UpdateTrackersAndTangeant();
         surface.PoissonDiskSamplingDistribution(levelSet,params.poissondiskradius, params.poissonAngleNormalThreshold);
     }
-
-    surface.CreateAndUpdateTrackersBasedOnPoissonDisk(surfaceGdp,trackersGdp,surfaceGroup,params);
+    cout << "Using less arguments"<<endl;
+    surface.CreateAndUpdateTrackersBasedOnPoissonDisk();
     //For the blending computation, we create uv array per vertex that we called patch
-    surface.AddSolidPatchesUsingBarycentricCoordinates(surfaceGdp,trackersGdp, params,surfaceTree);
-    surface.OrthogonalUVProjection(surfaceGdp,trackersGdp,params);
+    surface.AddSolidPatchesUsingBarycentricCoordinates();
+    surface.OrthogonalUVProjection();
 
     //=======================================================================
 

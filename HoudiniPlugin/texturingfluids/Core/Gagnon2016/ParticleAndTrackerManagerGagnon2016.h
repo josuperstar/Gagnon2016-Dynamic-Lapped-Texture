@@ -19,14 +19,14 @@ class ParticleAndTrackerManagerGagnon2016
 {
 public:
 
-    ParticleAndTrackerManagerGagnon2016(GU_Detail *surfaceGdp, GU_Detail *trackersGdp, ParametersDeformablePatches params);
-    vector<GA_Offset>  InitializeTrackersAndTangeants(GU_Detail* surface,GU_Detail *trackers, GA_PointGroup *surfaceGroup, ParametersDeformablePatches params);
-    void  CreateAndUpdateTrackersBasedOnPoissonDisk(GU_Detail* surface,GU_Detail *trackers, GA_PointGroup *surfaceGroup, ParametersDeformablePatches params);
-    void  UpdateTrackersAndTangeant(GU_Detail* surface,GU_Detail *trackers, GA_PointGroup *surfaceGroup, ParametersDeformablePatches params);
-    void AdvectSingleTrackers(GU_Detail *surfaceGdp, GU_Detail *trackers, ParametersDeformablePatches params);
-    void AdvectTrackersAndTangeants(GU_Detail *surfaceGdp, GU_Detail *trackers, ParametersDeformablePatches params);
-    void ComputeDivergence(GU_Detail *surfaceGdp, GU_Detail *trackers, ParametersDeformablePatches params, GEO_PointTreeGAOffset &tree);
-    void ComputeDensity(GU_Detail *surfaceGdp, GU_Detail *trackers, ParametersDeformablePatches params, GEO_PointTreeGAOffset &tree);
+    ParticleAndTrackerManagerGagnon2016(GU_Detail *surfaceGdp, GA_PointGroup *surfaceGroup, GU_Detail *trackersGdp, ParametersDeformablePatches params);
+    vector<GA_Offset>  InitializeTrackersAndTangeants();
+    void  CreateAndUpdateTrackersBasedOnPoissonDisk();
+    void  UpdateTrackersAndTangeant();
+    void AdvectSingleTrackers();
+    void AdvectTrackersAndTangeants();
+    void ComputeDivergence();
+    void ComputeDensity();
     void DeleteTracker(GU_Detail* trackers,int trackerId);
     vector<GA_Offset> PoissonDiskSamplingDistribution(GU_Detail *levelSet, float diskRadius, float angleNormalThreshold);
     bool RespectCriterion(UT_Vector3 newPointPosition, UT_Vector3 newPointNormal, float killDistance, int &numberOfClosePoint,   GA_Offset exclude );
@@ -90,8 +90,11 @@ protected :
     GA_RWHandleI    attNumberOfPrimitives;
 
     GU_Detail *trackersGdp;
-    GU_Detail *surface;
+    GU_Detail *surfaceGdp;
     GEO_PointTreeGAOffset trackerTree;
+    GEO_PointTreeGAOffset surfaceTree;
+
+    GA_PointGroup *surfaceGroup;
 
     ParametersDeformablePatches params;
 
